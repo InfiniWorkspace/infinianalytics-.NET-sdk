@@ -1,0 +1,12 @@
+<Solution>
+  <Folder Name="/samples/">
+    <Project Path="samples/SmokeTest/SmokeTest.csproj" />
+    <Project Path="samples/VbUsage/VbUsage.vbproj" />
+  </Folder>
+  <Folder Name="/src/">
+    <Project Path="src/InfiniAnalytics/InfiniAnalytics.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/InfiniAnalytics.Tests/InfiniAnalytics.Tests.csproj" />
+  </Folder>
+</Solution>

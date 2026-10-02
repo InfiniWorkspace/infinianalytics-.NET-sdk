@@ -1,0 +1,45 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFrameworks>net462;netstandard2.0;net10.0</TargetFrameworks>
+    <RootNamespace>InfiniAnalytics</RootNamespace>
+    <AssemblyName>InfiniAnalytics</AssemblyName>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <SignAssembly>true</SignAssembly>
+    <AssemblyOriginatorKeyFile>InfiniAnalytics.snk</AssemblyOriginatorKeyFile>
+    <IsTrimmable Condition="'$(TargetFramework)' == 'net10.0'">true</IsTrimmable>
+    <IsAotCompatible Condition="'$(TargetFramework)' == 'net10.0'">true</IsAotCompatible>
+  </PropertyGroup>
+
+  <PropertyGroup Label="NuGet">
+    <PackageId>InfiniAnalytics.Sdk</PackageId>
+    <Version>0.1.0</Version>
+    <Authors>InfiniAnalytics</Authors>
+    <Company>InfiniAnalytics</Company>
+    <Copyright>Copyright (c) 2026 InfiniAnalytics</Copyright>
+    <Description>SDK oficial de .NET para InfiniAnalytics: registra el inicio, los eventos, los warnings, los errores y el fin de las ejecuciones de tus automatizaciones sin que un fallo de red rompa nunca el robot.</Description>
+    <PackageTags>infinianalytics;sdk;automation;rpa;uipath;blueprism;monitoring;observability</PackageTags>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageProjectUrl>https://github.com/InfiniWorkspace/infinianalytics-.NET-sdk</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/InfiniWorkspace/infinianalytics-.NET-sdk.git</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <PublishRepositoryUrl>true</PublishRepositoryUrl>
+    <IncludeSymbols>true</IncludeSymbols>
+    <SymbolPackageFormat>snupkg</SymbolPackageFormat>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="..\..\README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
+
+  <ItemGroup Condition="'$(TargetFramework)' != 'net10.0'">
+    <PackageReference Include="System.Text.Json" />
+  </ItemGroup>
+
+  <ItemGroup Condition="'$(TargetFramework)' == 'net462'">
+    <Reference Include="System.Net.Http" />
+    <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies" PrivateAssets="all" />
+  </ItemGroup>
+
+</Project>

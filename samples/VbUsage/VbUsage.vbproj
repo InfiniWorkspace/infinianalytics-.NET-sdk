@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Compile-only check that the public API is usable from VB.NET, the default language of
+    UiPath Invoke Code and common in Blue Prism code stages (Event, Error and End are VB keywords).
+  -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <RootNamespace>VbUsage</RootNamespace>
+    <IsPackable>false</IsPackable>
+    <OptionStrict>On</OptionStrict>
+    <OptionInfer>On</OptionInfer>
+    <Nullable>disable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\InfiniAnalytics\InfiniAnalytics.csproj" />
+  </ItemGroup>
+
+</Project>
