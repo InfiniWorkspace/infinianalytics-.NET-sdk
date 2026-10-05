@@ -55,10 +55,47 @@ jobs:
             args+=("-p:Version=${GITHUB_REF_NAME#v}")
           fi
           dotnet pack src/InfiniAnalytics --configuration Release --output artifacts "${args[@]}"
+      # DLLs for hosts that cannot install NuGet packages (Power Automate Desktop, Blue Prism).
+      - name: DLL bundle
+        shell: bash
+        run: |
+          version="dev"
+          args=()
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+            args+=("-p:Version=${GITHUB_REF_NAME#v}")
+            version="${GITHUB_REF_NAME#v}"
+          fi
+          dotnet build tools/DllBundle --configuration Release --output dll-bundle "${args[@]}"
+          cd dll-bundle
+          zip "../artifacts/InfiniAnalytics-${version}-dotnet-framework-dlls.zip" \
+            InfiniAnalytics.dll Microsoft.Bcl.AsyncInterfaces.dll System.*.dll
       - uses: actions/upload-artifact@v4
         with:
           name: packages
           path: artifacts/*
+
+  github-release:
+    name: GitHub release
+    # Attaches the packages and the DLL bundle to a GitHub release for every v* tag, so
+    # Power Automate Desktop and Blue Prism users can download the DLLs without NuGet.
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: pack
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: packages
+          path: artifacts
+      - name: Create release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: >
+          gh release create "$GITHUB_REF_NAME" artifacts/*
+          --repo "$GITHUB_REPOSITORY"
+          --title "$GITHUB_REF_NAME"
+          --generate-notes
 
   publish:
     name: Publish to NuGet

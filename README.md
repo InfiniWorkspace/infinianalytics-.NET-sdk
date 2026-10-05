@@ -3,8 +3,9 @@
 InfiniAnalytics es una librería de .NET que facilita el registro de eventos, inicios y finales
 de procesos, así como la notificación de errores, en la plataforma de Analítica de Infini.
 
-Está pensada para automatizaciones escritas en .NET: aplicaciones y servicios en C#, robots de
-UiPath (actividad "Invoke Code") y "code stages" de Blue Prism.
+Está pensada para automatizaciones escritas en .NET: aplicaciones y servicios en C#, flujos de
+Power Automate Desktop (acción "Ejecutar script de .NET"), robots de UiPath (actividad "Invoke
+Code") y "code stages" de Blue Prism.
 
 El diseño está orientado a que nunca quiebre el flujo de tu automatismo o aplicación: ante
 cualquier error de comunicación, timeout o respuesta inesperada de la API, la librería registra
@@ -31,7 +32,7 @@ el fallo en el log y devuelve `null` (o `false` en el caso de `Ping`), pero no l
 
 | Plataforma | Build que se usa |
 |---|---|
-| .NET Framework 4.6.2 o superior (UiPath Legacy, Blue Prism) | `net462` |
+| .NET Framework 4.6.2 o superior (Power Automate Desktop, UiPath Legacy, Blue Prism) | `net462` |
 | .NET 10 o superior | `net10.0` (sin dependencias externas) |
 | Resto de plataformas compatibles con .NET Standard 2.0 (.NET 6, 8, 9, Mono...) | `netstandard2.0` |
 
@@ -41,8 +42,12 @@ el fallo en el log y devuelve `null` (o `false` en el caso de `Ping`), pero no l
 dotnet add package InfiniAnalytics.Sdk
 ```
 
-En UiPath, instálalo desde "Manage Packages" buscando `InfiniAnalytics.Sdk`. En Blue Prism,
-consulta la sección [Blue Prism](#blue-prism).
+En UiPath, instálalo desde "Manage Packages" buscando `InfiniAnalytics.Sdk`. Power Automate
+Desktop y Blue Prism no instalan paquetes NuGet: descarga el fichero
+`InfiniAnalytics-<versión>-dotnet-framework-dlls.zip` de la página de
+[Releases](https://github.com/InfiniWorkspace/infinianalytics-.NET-sdk/releases), que contiene
+el SDK y todas sus dependencias, y consulta las secciones
+[Power Automate Desktop](#power-automate-desktop) y [Blue Prism](#blue-prism).
 
 ## Uso básico
 
@@ -173,6 +178,31 @@ Cada vez que llamas a `StartExecutionAsync(...)` se usa el `executionId` que le 
 pasas ninguno (o pasas una cadena vacía), se genera uno con la fecha y hora actuales en UTC en
 formato ISO 8601, por ejemplo `2026-10-02T15:04:05.123Z`.
 
+El identificador lo genera el SDK en el equipo donde se ejecuta tu automatización, no la API. El
+recorrido del dato es este:
+
+1. `StartExecutionAsync(...)` usa el `executionId` que le pases o, si no le pasas ninguno,
+   genera uno nuevo a partir de la hora actual.
+2. Lo guarda en la propiedad `ExecutionId` del `Execution` que devuelve y lo envía a la API junto
+   con el evento `START`.
+3. `EventAsync`, `WarningAsync`, `ErrorAsync` y `EndAsync` envían ese mismo identificador. Así
+   la API agrupa todos los eventos en una sola ejecución.
+4. Si necesitas seguir registrando eventos en otro paso que no puede recibir el objeto
+   `Execution` (otra actividad de UiPath, otra acción de Power Automate Desktop, otro stage de
+   Blue Prism), lee `execution.ExecutionId`, pásalo a ese paso y reconstruye el `Execution` con
+   `new Execution(client, automationId, executionId)`. Esto no envía un nuevo `START`.
+
+```
+StartExecution(automationId)            el SDK genera "2026-10-02T15:04:05.123Z"
+  -> envía START con ese id a la API
+  -> devuelve execution (execution.ExecutionId = "2026-10-02T15:04:05.123Z")
+execution.Event / Warning / Error / End -> envían el mismo id
+execution.ExecutionId                   -> puedes guardarlo y pasarlo a otros pasos
+```
+
+La API no devuelve ni modifica el identificador: lo que ves en el panel ("ID Ejecución") es
+exactamente el valor que generó o recibió el SDK.
+
 Un `executionId` identifica una ejecución y no debe reutilizarse en dos ejecuciones simultáneas
 de la misma automatización. Si una automatización puede ejecutarse en paralelo (por ejemplo, en
 varios robots a la vez), pasa un identificador propio único, como `Guid.NewGuid().ToString()`.
@@ -190,6 +220,11 @@ var execution = client.StartExecution("44444444-4444-4444-4444-444444444444", de
 execution.Event("Facturas descargadas");
 execution.End("Fin del proceso");
 ```
+
+### Power Automate Desktop
+
+Se usa desde la acción "Ejecutar script de .NET" en C#, cargando el SDK desde la carpeta de DLL.
+Consulta la guía paso a paso en [docs/power-automate-desktop.md](docs/power-automate-desktop.md).
 
 ### UiPath (Invoke Code)
 
@@ -223,10 +258,10 @@ execution.End("Fin del proceso")
 
 ### Blue Prism
 
-1. Copia en la carpeta de instalación de Blue Prism la DLL `InfiniAnalytics.dll` del build
-   `net462` del paquete (carpeta `lib/net462`) y sus dependencias: `System.Text.Json.dll`,
-   `System.Text.Encodings.Web.dll`, `System.Memory.dll`, `System.Buffers.dll`,
-   `System.Numerics.Vectors.dll`, `System.Runtime.CompilerServices.Unsafe.dll`,
+1. Copia en la carpeta de instalación de Blue Prism el contenido del fichero
+   `InfiniAnalytics-<versión>-dotnet-framework-dlls.zip`: la DLL `InfiniAnalytics.dll` y sus
+   dependencias, `System.Text.Json.dll`, `System.Text.Encodings.Web.dll`, `System.Memory.dll`,
+   `System.Buffers.dll`, `System.Numerics.Vectors.dll`, `System.Runtime.CompilerServices.Unsafe.dll`,
    `System.Threading.Tasks.Extensions.dll`, `System.ValueTuple.dll` y
    `Microsoft.Bcl.AsyncInterfaces.dll`.
 2. En las "Code Options" del objeto de negocio, añade `InfiniAnalytics.dll` a las referencias
@@ -368,6 +403,15 @@ dotnet build
 dotnet test
 dotnet pack src/InfiniAnalytics -c Release -o artifacts
 ```
+
+Para generar la carpeta de DLL de Power Automate Desktop y Blue Prism (el SDK con todas sus
+dependencias):
+
+```bash
+dotnet build tools/DllBundle -c Release -o artifacts/dll-bundle
+```
+
+`DllBundle.dll` es solo el proyecto auxiliar y no forma parte de la carpeta que se distribuye.
 
 Ningún test llama a la API real. Para una prueba de integración real (no se ejecuta en CI),
 copia `.env.example` como `.env` en la raíz del repositorio, rellena el token de organización y

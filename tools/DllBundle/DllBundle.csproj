@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Not shipped. Builds InfiniAnalytics for .NET Framework hosts that cannot install NuGet
+    packages (Power Automate Desktop "Run .NET script", Blue Prism code stages) and copies its
+    dependencies next to it, so the folder can be zipped and loaded as is.
+    net472 matches the runtime of Power Automate Desktop; it consumes the net462 build of the SDK.
+  -->
+  <PropertyGroup>
+    <TargetFramework>net472</TargetFramework>
+    <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\InfiniAnalytics\InfiniAnalytics.csproj" />
+    <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies" PrivateAssets="all" />
+  </ItemGroup>
+
+</Project>

@@ -18,7 +18,7 @@
     <Company>InfiniAnalytics</Company>
     <Copyright>Copyright (c) 2026 InfiniAnalytics</Copyright>
     <Description>SDK oficial de .NET para InfiniAnalytics: registra el inicio, los eventos, los warnings, los errores y el fin de las ejecuciones de tus automatizaciones sin que un fallo de red rompa nunca el robot.</Description>
-    <PackageTags>infinianalytics;sdk;automation;rpa;uipath;blueprism;monitoring;observability</PackageTags>
+    <PackageTags>infinianalytics;sdk;automation;rpa;powerautomate;uipath;blueprism;monitoring;observability</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <PackageProjectUrl>https://github.com/InfiniWorkspace/infinianalytics-.NET-sdk</PackageProjectUrl>
