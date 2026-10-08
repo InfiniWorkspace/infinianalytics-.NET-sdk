@@ -21,6 +21,7 @@
     <PackageTags>infinianalytics;sdk;automation;rpa;powerautomate;uipath;blueprism;monitoring;observability</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageIcon>icon.png</PackageIcon>
     <PackageProjectUrl>https://github.com/InfiniWorkspace/infinianalytics-.NET-sdk</PackageProjectUrl>
     <RepositoryUrl>https://github.com/InfiniWorkspace/infinianalytics-.NET-sdk.git</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
@@ -31,6 +32,7 @@
 
   <ItemGroup>
     <None Include="..\..\README.md" Pack="true" PackagePath="\" />
+    <None Include="..\..\assets\icon.png" Pack="true" PackagePath="\" />
   </ItemGroup>
 
   <ItemGroup Condition="'$(TargetFramework)' != 'net10.0'">
