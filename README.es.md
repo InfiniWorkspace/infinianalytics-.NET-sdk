@@ -426,6 +426,9 @@ dotnet run --project samples/SmokeTest
 `.env` está en `.gitignore` y nunca se sube al repositorio. Las variables de entorno con el mismo
 nombre, si existen, tienen prioridad sobre el fichero.
 
+Para publicar una nueva versión en nuget.org y en GitHub Releases, consulta
+[docs/publishing.es.md](docs/publishing.es.md).
+
 ## Licencia
 
 MIT. Consulta el fichero [LICENSE](LICENSE).

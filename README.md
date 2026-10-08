@@ -428,6 +428,9 @@ dotnet run --project samples/SmokeTest
 `.env` is in `.gitignore` and is never pushed to the repository. Environment variables with the
 same name, if they exist, take precedence over the file.
 
+To publish a new version to nuget.org and GitHub Releases, see
+[docs/publishing.md](https://github.com/InfiniWorkspace/infinianalytics-.NET-sdk/blob/main/docs/publishing.md).
+
 ## License
 
 MIT. See the [LICENSE](https://github.com/InfiniWorkspace/infinianalytics-.NET-sdk/blob/main/LICENSE) file.
