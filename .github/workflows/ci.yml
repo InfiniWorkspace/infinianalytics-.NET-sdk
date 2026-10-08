@@ -100,12 +100,18 @@ jobs:
   publish:
     name: Publish to NuGet
     # Runs only for v* tags and only once the repository variable NUGET_PUBLISH_ENABLED is
-    # set to "true" and the secret NUGET_API_KEY exists (Settings > Secrets and variables > Actions).
+    # set to "true" and the secret NUGET_USER exists (Settings > Secrets and variables > Actions).
+    # Uses nuget.org Trusted Publishing: no long-lived API key, the login step exchanges the
+    # GitHub OIDC token for a short-lived key. The nuget.org policy is bound to this repository
+    # and to ci.yml, so renaming this file breaks publishing until the policy is updated.
     # To require a manual approval before publishing, create an environment in
-    # Settings > Environments and reference it here with "environment: <name>".
+    # Settings > Environments, reference it here with "environment: <name>" and add the same
+    # environment to the Trusted Publishing policy on nuget.org.
     if: startsWith(github.ref, 'refs/tags/v') && vars.NUGET_PUBLISH_ENABLED == 'true'
     needs: pack
     runs-on: ubuntu-latest
+    permissions:
+      id-token: write
     steps:
       - uses: actions/download-artifact@v4
         with:
@@ -114,9 +120,15 @@ jobs:
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: 10.0.x
+      - name: NuGet login
+        uses: NuGet/login@v1
+        id: login
+        with:
+          # nuget.org profile name (not the email address) of a member of the package owner.
+          user: ${{ secrets.NUGET_USER }}
       - name: Push
         run: >
           dotnet nuget push "artifacts/*.nupkg"
-          --api-key "${{ secrets.NUGET_API_KEY }}"
+          --api-key "${{ steps.login.outputs.NUGET_API_KEY }}"
           --source https://api.nuget.org/v3/index.json
           --skip-duplicate
