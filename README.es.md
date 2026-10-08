@@ -1,5 +1,7 @@
 # InfiniAnalytics para .NET
 
+[English](README.md) | **Español**
+
 InfiniAnalytics es una librería de .NET que facilita el registro de eventos, inicios y finales
 de procesos, así como la notificación de errores, en la plataforma de Analítica de Infini.
 
@@ -224,7 +226,7 @@ execution.End("Fin del proceso");
 ### Power Automate Desktop
 
 Se usa desde la acción "Ejecutar script de .NET" en C#, cargando el SDK desde la carpeta de DLL.
-Consulta la guía paso a paso en [docs/power-automate-desktop.md](docs/power-automate-desktop.md).
+Consulta la guía paso a paso en [docs/power-automate-desktop.es.md](docs/power-automate-desktop.es.md).
 
 ### UiPath (Invoke Code)
 

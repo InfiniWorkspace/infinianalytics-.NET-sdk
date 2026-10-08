@@ -1,5 +1,7 @@
 # InfiniAnalytics en Power Automate Desktop
 
+[English](power-automate-desktop.md) | **Español**
+
 Esta guía explica cómo registrar las ejecuciones de un flujo de Power Automate Desktop en
 InfiniAnalytics usando el SDK de .NET desde la acción "Ejecutar script de .NET".
 
