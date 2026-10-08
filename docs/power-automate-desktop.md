@@ -2,13 +2,10 @@
 
 **English** | [Español](power-automate-desktop.es.md)
 
-This guide explains how to register the executions of a Power Automate Desktop flow in
+This guide explains how to register the executions of a Power Automate Desktop (PAD) flow in
 InfiniAnalytics using the .NET SDK from the "Run .NET script" action.
 
-Power Automate Desktop does not install NuGet packages, so the SDK is loaded from a folder with
-its DLLs.
-
-This guide is only for desktop flows. Power Automate cloud flows cannot run .NET code.
+It is only for desktop flows. Power Automate cloud flows cannot run .NET code.
 
 ## Requirements
 
@@ -18,6 +15,34 @@ This guide is only for desktop flows. Power Automate cloud flows cannot run .NET
 - The `InfiniAnalytics-<version>-dotnet-framework-dlls.zip` file, downloaded from the
   [Releases](https://github.com/InfiniWorkspace/infinianalytics-.NET-sdk/releases) page of the
   repository.
+
+## What the flow looks like
+
+At the end of this guide, the flow will look like this:
+
+```
+Main
+  Set variable              IA_Token, IA_AutomationId, IA_EventType, IA_Description,
+                            IA_ErrorId, IA_ErrorDetail             (section 3)
+  Run .NET script           start: registers START                 (section 4)
+
+  ... actions of your process ...
+  Set variable              IA_EventType = EVENT, IA_Description = ...  (section 6)
+  Run subflow               IA_Register
+
+  On block error                                                   (section 7)
+    ... actions of your process that may fail ...
+  End
+
+  Set variable              IA_EventType = END, IA_Description = ...    (section 6)
+  Run subflow               IA_Register
+
+Subflow IA_Register         registers EVENT, WARNING, ERROR or END (section 5)
+Subflow IA_Error            registers the error of the block       (section 7)
+```
+
+There are only two pieces of C# code, which you copy as they are: the start code (in Main) and
+the register code (in the `IA_Register` subflow). The rest of the flow is regular PAD actions.
 
 ## 1. Prepare the DLL folder
 
@@ -39,45 +64,68 @@ This guide is only for desktop flows. Power Automate cloud flows cannot run .NET
 
 If the flow runs on several machines, the folder must exist on all of them with the same path.
 
-## 2. Configure the "Run .NET script" action
+## 2. Three ideas before you start
 
-All the SDK actions are configured the same way. Only the parameters and the code change.
+**Script parameters connect the C# code with the flow.** In the "Script parameters" table of
+the "Run .NET script" action, each row is a value that goes into or comes out of the code:
+
+| Column | What you write |
+|---|---|
+| Parameter name | The name used by the code. Copy it exactly from this guide, do not make it up. |
+| Direction | `In` if the value goes into the code, `Out` if the code returns it. |
+| Input value | Only in `In` rows: where the value comes from. A flow variable with `%` (for example `%IA_Token%`) or a fixed text. |
+| Output variable | Only in `Out` rows: the name of the variable where the result is stored, without `%`. |
+
+**Input variables are created beforehand; output variables are not.** A variable used as an
+input value must exist when the action runs, so you create it earlier with "Set variable". A
+variable used as an output variable is created by the action itself when it finishes, just like
+"Display message" creates `ButtonPressed`.
+
+**Variables are shared by the whole flow.** A variable created in Main can be used in any
+subflow. To change its value, add another "Set variable" action with the same name: it does not
+create a new variable, it replaces the value.
+
+## 3. Create the variables
+
+At the beginning of Main, add one "Set variable" action for each row:
+
+| Variable | Value |
+|---|---|
+| `IA_Token` | Your token |
+| `IA_AutomationId` | The identifier of the automation |
+| `IA_EventType` | `%''%` |
+| `IA_Description` | `%''%` |
+| `IA_ErrorId` | `%''%` |
+| `IA_ErrorDetail` | `%''%` |
+
+`%''%` is an empty text: those variables get a value later. In the variables pane, mark
+`IA_Token` as sensitive so that it does not appear in the flow logs.
+
+## 4. Register the start (Main)
+
+Below the variables, add the "Run .NET script" action:
 
 | Field | Value |
 |---|---|
 | Language | `C#` |
 | .NET script imports | `System` and `InfiniAnalytics`, **one per line** (see below) |
 | References to be loaded | The DLL folder, for example `C:\InfiniAnalytics\dlls` |
-| Script parameters | Those of each action (see the following sections) |
-| .NET code to run | The code of each action (see the following sections) |
 
-The ".NET script imports" field is a text box, not a list of variables. Type exactly this:
+The ".NET script imports" field is a text box. Type exactly this:
 
 ```
 System
 InfiniAnalytics
 ```
 
-In "Script parameters", click "Edit" and add one row per parameter:
+**Script parameters** (click "Edit"), exactly these 4 rows, all of type `String`:
 
-- **In** parameters receive a value in the input value column. That column is only enabled
-  when the direction is In.
-- **Out** parameters return a value to the flow in the variable set in the output variable
-  column.
-- The parameter name must match exactly (including case) the name used by the code.
-
-## 3. Register the start of the execution
-
-Add this action at the beginning of the flow.
-
-**Script parameters:**
-
-| Parameter name | Type | Direction | Input value | Output variable |
-|---|---|---|---|---|
-| `token` | String | In | `%IA_Token%` | |
-| `automationId` | String | In | `%IA_AutomationId%` | |
-| `description` | String | In | `Start of the process` | |
-| `executionId` | String | Out | | `%IA_ExecutionId%` |
+| Parameter name | Direction | Input value | Output variable |
+|---|---|---|---|
+| `token` | In | `%IA_Token%` | |
+| `automationId` | In | `%IA_AutomationId%` | |
+| `description` | In | `Start of the process` | |
+| `executionId` | Out | | `IA_ExecutionId` |
 
 **.NET code to run:**
 
@@ -87,73 +135,27 @@ var execution = client.StartExecution(automationId, null, description);
 executionId = execution.ExecutionId;
 ```
 
-Store the token and the automation identifier in the `%IA_Token%` and `%IA_AutomationId%`
-variables at the beginning of the flow, with the "Set variable" action. Mark `%IA_Token%` as
-sensitive so that it does not appear in the flow logs.
+This action registers the `START` and stores the execution identifier in `%IA_ExecutionId%`.
+The subflow in the next section uses it so that all the events appear together in the same
+execution in the dashboard.
 
-`%IA_ExecutionId%` identifies the execution. The following actions need it to associate their
-events with this execution.
+## 5. Subflow to register events (`IA_Register`)
 
-### Where `%IA_ExecutionId%` comes from
+Create a subflow named `IA_Register` with a single "Run .NET script" action. Language, imports
+and references, the same as in section 4.
 
-The execution identifier is not generated by Power Automate Desktop or by the InfiniAnalytics
-API: it is generated by the SDK inside the "Run .NET script" action. This is how the value
-travels:
+**Script parameters**, exactly these 8 rows, all of type `String`:
 
-1. The code calls `client.StartExecution(automationId, null, description)`. The second argument
-   is the execution identifier. When you pass `null`, the SDK generates a new one from the
-   current UTC date and time, for example `2026-10-05T14:38:14.640Z`.
-2. The SDK sends that identifier to the API with the `START` event and stores it in
-   `execution.ExecutionId`.
-3. The line `executionId = execution.ExecutionId;` copies it to the `executionId` output
-   parameter.
-4. When the action finishes, Power Automate Desktop copies the output parameter to the variable
-   set as its output variable, `%IA_ExecutionId%`.
-5. The actions in section 4 receive `%IA_ExecutionId%` as an input parameter and rebuild the
-   execution with `new Execution(...)`, which does not send a new `START`. This way all the
-   events reach the API with the same identifier and appear together in the dashboard.
-
-```
-"Start" action (.NET script)
-  StartExecution(automationId, null, ...)   the SDK generates "2026-10-05T14:38:14.640Z"
-    -> sends START to the API with that id
-  executionId = execution.ExecutionId        output parameter
-Power Automate Desktop
-  output parameter -> %IA_ExecutionId%
-"Register" action (.NET script)
-  %IA_ExecutionId% -> executionId input parameter
-  new Execution(..., executionId).Event(...) sends the event with the same id
-```
-
-The variables of a .NET script do not survive from one action to another: the only thing that
-passes from one action to the next is the output parameters stored in flow variables. That is
-why the identifier has to travel in `%IA_ExecutionId%`.
-
-If the same flow can run at the same time on several machines, two executions that start in the
-same millisecond would have the same identifier. To avoid it, pass your own unique identifier
-instead of `null`, for example `Guid.NewGuid().ToString()`:
-
-```csharp
-var execution = client.StartExecution(automationId, Guid.NewGuid().ToString(), description);
-```
-
-## 4. Register events, warnings, errors and the end
-
-Use this same action for any event after the start. The event type is set in the `eventType`
-parameter.
-
-**Script parameters:**
-
-| Parameter name | Type | Direction | Input value | Output variable |
-|---|---|---|---|---|
-| `token` | String | In | `%IA_Token%` | |
-| `automationId` | String | In | `%IA_AutomationId%` | |
-| `executionId` | String | In | `%IA_ExecutionId%` | |
-| `eventType` | String | In | `EVENT`, `WARNING`, `ERROR` or `END` | |
-| `description` | String | In | Text of the event | |
-| `errorId` | String | In | Error code (only for `ERROR`, can be empty) | |
-| `errorDetail` | String | In | Error detail (only for `ERROR`, can be empty) | |
-| `result` | String | Out | | `%IA_Result%` |
+| Parameter name | Direction | Input value | Output variable |
+|---|---|---|---|
+| `token` | In | `%IA_Token%` | |
+| `automationId` | In | `%IA_AutomationId%` | |
+| `executionId` | In | `%IA_ExecutionId%` | |
+| `eventType` | In | `%IA_EventType%` | |
+| `description` | In | `%IA_Description%` | |
+| `errorId` | In | `%IA_ErrorId%` | |
+| `errorDetail` | In | `%IA_ErrorDetail%` | |
+| `result` | Out | | `IA_Result` |
 
 **.NET code to run:**
 
@@ -182,47 +184,107 @@ switch (eventType)
 result = registered != null ? "OK" : "NOT REGISTERED";
 ```
 
-`%IA_Result%` is `OK` if the API stored the event, or `NOT REGISTERED` if it could not be
-registered (network failure, timeout, invalid token or a misspelled `eventType`). You do not
-need to check it: the SDK never stops the flow because of a communication failure.
+The code registers whatever `%IA_EventType%` says:
 
-To avoid repeating the configuration, create a subflow (for example `IA_Register`) with this
-single action, using variables such as `%IA_EventType%` and `%IA_Description%` in the input
-values. At each point of the flow, set those variables and call the subflow with "Run subflow".
+| Value of `IA_EventType` | What it registers |
+|---|---|
+| `EVENT` | A milestone of the process |
+| `WARNING` | A warning that needs attention |
+| `ERROR` | An error |
+| `END` | The end of the execution |
 
-## 5. Register the flow errors
+When it finishes, `%IA_Result%` is `OK` if the API stored the event, or `NOT REGISTERED` if it
+could not be registered (network failure, timeout, invalid token or a misspelled
+`IA_EventType`). You do not need to check it: the SDK never stops the flow because of a
+communication failure.
 
-To report to InfiniAnalytics the errors that occur in the flow:
+## 6. Register events and the end (Main)
 
-1. Group the actions of the process in an "On block error" block.
-2. In the error handling of the block, add the "Get last error" action to store the error in
-   `%LastError%`.
-3. Add the action from section 4 with `eventType` = `ERROR`, a `description` such as
-   `Process failed` and `errorDetail` = `%LastError.Message%`.
-4. At the end of the flow, always register the `END`. If an `ERROR` was registered before, the
-   execution is shown as finished with error in the dashboard.
+To register something at any point of Main, add these three actions:
 
-## 6. Check the result
+1. "Set variable" `IA_EventType` with the type, for example `EVENT`. Type it as is, without
+   quotes or `%`.
+2. "Set variable" `IA_Description` with the text, for example `Invoices downloaded`.
+3. "Run subflow" `IA_Register`.
 
-Run the flow and open the executions section of the InfiniAnalytics dashboard. An execution with
-the identifier of `%IA_ExecutionId%` and all the registered events must appear. With an `END` and
-no previous errors, the execution is shown as finished. If there was an `ERROR`, it is shown as
+At the end of the flow, do the same with `IA_EventType` = `END` and a description such as
+`End of the process`. Always register the `END`: without it, the execution stays open in the
+dashboard.
+
+## 7. Register the flow errors
+
+If a PAD action fails, the flow stops. To register the error in InfiniAnalytics and still end
+the execution properly:
+
+**1. Create the `IA_Error` subflow** with these actions:
+
+| # | Action | Configuration |
+|---|---|---|
+| 1 | Get last error | Stores the error in `LastError` |
+| 2 | Set variable | `IA_EventType` = `ERROR` |
+| 3 | Set variable | `IA_Description` = `Process failed` |
+| 4 | Set variable | `IA_ErrorDetail` = `%LastError.Message%` |
+| 5 | Run subflow | `IA_Register` |
+
+**2. In Main, put the actions of the process in an error block.** Add the "On block error"
+action and place the actions that may fail inside it, between the action and its "End". The
+`END` actions go **after** the "End" of the block, never inside it.
+
+**3. Configure the block.** Open the "On block error" action:
+
+- Add a new rule ("New rule") to **run the subflow** `IA_Error`.
+- Enable **"Continue flow run"** and choose to continue from the **end of the block**.
+
+If you do not enable "Continue flow run", the flow stops after `IA_Error`, the `END` is not
+registered and the execution appears in the dashboard with the error status instead of
 finished with error.
+
+## 8. Check the result
+
+Run the flow and open the execution in the InfiniAnalytics dashboard. Its execution ID is the
+value of `%IA_ExecutionId%`. Depending on the registered events, the status will be:
+
+| Events | Status |
+|---|---|
+| `START` (and intermediate events), no `END` | Started |
+| `START` ... `END` | Finished |
+| `START` ... `ERROR` ... `END` | Finished with error |
+| `START` ... `ERROR`, no `END` | Error |
+
+## If the flow runs in parallel
+
+The SDK generates the execution identifier from the current UTC date and time, for example
+`2026-10-08T13:15:03.649Z`. If the same flow can run at the same time on several machines, two
+executions that start in the same millisecond would have the same identifier. To avoid it, pass
+a unique identifier instead of `null` in the start code:
+
+```csharp
+var execution = client.StartExecution(automationId, Guid.NewGuid().ToString(), description);
+```
 
 ## Troubleshooting
 
-- **Error saying that variable 'X' has been defined but not initialized.** No previous action
-  produces that variable. Check that the output variable of the parameter has exactly that name
-  and that the "Run .NET script" action comes earlier in the flow.
-- **I cannot type in the input value column.** The direction of the parameter is Out. Change it
-  to In.
-- **Compilation error such as "The name 'X' does not exist in the current context".** The name
-  of a parameter does not match the one in the code, or `InfiniAnalytics` is missing from the
-  imports (remember: one namespace per line).
+- **Error saying that variable 'X' has been defined but not initialized.** The flow uses the
+  variable `X` before it exists. If it is an input variable, create it earlier with "Set
+  variable" (section 3). If it is `IA_ExecutionId`, check that the start action comes earlier
+  and that its output variable has exactly that name.
+- **"The name 'X' does not exist in the current context"** (compilation error). The code uses a
+  parameter `X` that is not in the parameters table, or is spelled differently. Compare the
+  table with the one in this guide, including case. It also appears if `InfiniAnalytics` is
+  missing from the imports (remember: one namespace per line).
+- **Error saying that the value is not unique** in the parameters table. Two rows have the same
+  parameter name. Delete one.
+- **I cannot type in the input value or output variable column.** The input value is only
+  enabled with the `In` direction, and the output variable with the `Out` direction.
+- **The action fails because of an output parameter.** Every `Out` parameter must get a value
+  in the code. If the table has an `Out` row that the code does not use, delete it.
 - **`FileNotFoundException` or `FileLoadException` for some DLL.** One of the 10 DLLs is missing
-  from the references folder, or the "References to be loaded" path is not correct.
+  from the folder, or the "References to be loaded" path is not correct.
 - **Error such as "An attempt was made to load an assembly from a network location".** Windows
   has blocked the DLLs for coming from the Internet. Unblock the `.zip` (section 1) and extract
   it again.
-- **The result is `NOT REGISTERED`.** Check the token, the automation identifier and that the
-  machine has Internet access. Each call waits at most 10 seconds for the API.
+- **The execution has the error status and no `END`.** The error block is not configured to
+  continue, or the `END` actions are inside the block (section 7).
+- **`%IA_Result%` is `NOT REGISTERED`.** Check the token, the automation identifier, that
+  `%IA_EventType%` is one of the four valid values and that the machine has Internet access.
+  Each call waits at most 10 seconds for the API.
