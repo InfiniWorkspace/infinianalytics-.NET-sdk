@@ -23,8 +23,7 @@ public sealed class InfiniAnalyticsClient
 {
     private const string RegisterPath = "/v1/register/";
 
-    // TODO: switch to "/v1/ping/" (with the token header) once the backend implements it.
-    private const string PingPath = "/health";
+    private const string PingPath = "/v1/ping/";
 
     private const int MaxLoggedBodyLength = 1000;
 
@@ -103,20 +102,31 @@ public sealed class InfiniAnalyticsClient
     }
 
     /// <summary>
-    /// Checks that the API is reachable. Returns <see langword="true"/> on a 2xx response and
-    /// <see langword="false"/> otherwise; never throws for communication failures.
+    /// Checks that the API is reachable and accepts the token, by calling <c>GET /v1/ping/</c>.
+    /// Returns <see langword="true"/> on a 2xx response and <see langword="false"/> otherwise
+    /// (e.g. 401 for an invalid token); never throws for communication failures.
     /// </summary>
-    /// <remarks>
-    /// Currently calls <c>GET /health</c>, which confirms the API is reachable but does not
-    /// validate the token. It will call <c>GET /v1/ping/</c>, which also validates the token,
-    /// once the backend implements it.
-    /// </remarks>
     /// <param name="cancellationToken">Cancels the call; cancellation throws <see cref="OperationCanceledException"/>.</param>
     public async Task<bool> PingAsync(CancellationToken cancellationToken = default)
     {
         using var request = new HttpRequestMessage(HttpMethod.Get, _baseUrl + PingPath);
+        request.Headers.TryAddWithoutValidation("token", _token);
+
         var response = await SendAsync(request, "pinging", cancellationToken).ConfigureAwait(false);
-        return response is { IsSuccess: true };
+        if (response is null)
+        {
+            return false;
+        }
+
+        if (!response.IsSuccess)
+        {
+            Log(
+                InfiniAnalyticsLogLevel.Error,
+                $"Ping failed (API responded with {response.StatusCode} {response.ReasonPhrase}): " + Shorten(response.Body));
+            return false;
+        }
+
+        return true;
     }
 
     /// <summary>Synchronous version of <see cref="PingAsync"/>, safe to call from any thread.</summary>

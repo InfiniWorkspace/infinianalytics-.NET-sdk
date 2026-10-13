@@ -277,12 +277,11 @@ execution.End("Fin del proceso")
 bool reachable = await client.PingAsync();
 ```
 
-Devuelve `true` si la API responde con un código 2xx y `false` en caso contrario.
+Llama a `GET /v1/ping/` con el token. Devuelve `true` si la API responde con un código 2xx, lo
+que confirma que la API está accesible y que el token es válido, y `false` en caso contrario (por
+ejemplo, 401 si el token no es válido). El motivo del fallo queda registrado en el log.
 
-**Nota:** de momento `PingAsync` consulta `GET /health`, que confirma que la API está accesible
-pero **no valida el token**. Cuando el backend publique `GET /v1/ping/`, el SDK pasará a usarlo y
-validará también el token. Para comprobar que el token y el `automationId` son correctos, registra
-una ejecución de prueba.
+`PingAsync` no comprueba el `automationId`: para verificarlo, registra una ejecución de prueba.
 
 ## API de bajo nivel
 

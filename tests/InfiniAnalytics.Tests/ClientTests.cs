@@ -441,7 +441,7 @@ public class ClientTests
     }
 
     [Fact]
-    public async Task PingAsync_calls_health_and_returns_true_when_the_api_responds_ok()
+    public async Task PingAsync_calls_v1_ping_with_the_token_and_returns_true_when_the_api_responds_ok()
     {
         var handler = FakeHttpMessageHandler.Returning(HttpStatusCode.OK, "{\"status\":\"ok\"}");
         var client = TestClient.Create(handler);
@@ -449,16 +449,22 @@ public class ClientTests
         Assert.True(await client.PingAsync());
         var request = Assert.Single(handler.Requests);
         Assert.Equal(HttpMethod.Get, request.Method);
-        Assert.Equal("https://api.analytics.infini.es/health", request.Uri.ToString());
-        Assert.False(request.Headers.ContainsKey("token"));
+        Assert.Equal("https://api.analytics.infini.es/v1/ping/", request.Uri.ToString());
+        Assert.Equal(TestClient.Token, request.Headers["token"]);
     }
 
     [Fact]
-    public async Task PingAsync_returns_false_when_the_api_responds_with_an_error_status()
+    public async Task PingAsync_returns_false_and_logs_when_the_api_responds_with_an_error_status()
     {
-        var client = TestClient.Create(FakeHttpMessageHandler.Returning(HttpStatusCode.ServiceUnavailable));
+        var log = new LogRecorder();
+        var client = TestClient.Create(
+            FakeHttpMessageHandler.Returning(HttpStatusCode.Unauthorized, "{\"detail\":\"Invalid token\"}"), log);
 
         Assert.False(await client.PingAsync());
+        var entry = Assert.Single(log.Entries);
+        Assert.Equal(InfiniAnalyticsLogLevel.Error, entry.Level);
+        Assert.Contains("401", entry.Message);
+        Assert.DoesNotContain(TestClient.Token, log.AllText());
     }
 
     [Fact]

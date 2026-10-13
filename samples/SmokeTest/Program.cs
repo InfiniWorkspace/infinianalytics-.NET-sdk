@@ -44,7 +44,7 @@ var client = new InfiniAnalyticsClient(new InfiniAnalyticsClientOptions
     },
 });
 
-Console.WriteLine("1) PingAsync() [GET /health]...");
+Console.WriteLine("1) PingAsync() [GET /v1/ping/]...");
 Check("ping", await client.PingAsync());
 
 Console.WriteLine("2) StartExecutionAsync() [START]...");
