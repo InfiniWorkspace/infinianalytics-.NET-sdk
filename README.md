@@ -64,13 +64,15 @@ var execution = await client.StartExecutionAsync(
     description: "Starting the process");
 ```
 
-- `token`: your organization token, which identifies you for authentication. You will find it in
-  the InfiniAnalytics dashboard. Do not write it in the code: read it from the configuration, an
-  environment variable or a credential store (Orchestrator Assets in UiPath, Credentials in Blue
-  Prism).
-- `automationId`: identifier (UUID) of your automation.
-- `executionId` (optional): identifier of the execution. If you omit it, one is generated
-  automatically.
+- `token`: your organization token, a secret string that identifies you for authentication. You
+  will find it in the Infini Analytics dashboard, on the page where your organization is managed.
+  Do not write it in the code: read it from the configuration, an environment variable or a
+  credential store (Orchestrator Assets in UiPath, Credentials in Blue Prism).
+- `automationId`: identifier (UUID) of your automation. You will find it in your list of
+  automations in the dashboard; if you do not have it, ask your platform administrator.
+- `executionId` (optional): unique identifier of the execution, for example a timestamp such as
+  `2026-07-27T11:52:15.716617` or a UUID. If you omit it, one is generated automatically. See
+  [Execution identifier](#execution-identifier-executionid).
 
 `StartExecutionAsync(...)` registers the `START` event and returns an `Execution` with which to
 register the rest of the events of that execution. It always returns an `Execution`, even if
@@ -86,7 +88,8 @@ The client is safe to use from multiple threads: create one and reuse it.
 await execution.EventAsync("An event occurred");
 ```
 
-Registers a relevant event (a milestone) during the execution.
+Registers a relevant event during the execution, without marking it as finished, with a warning
+or failed.
 
 #### Warning (`WarningAsync`)
 
@@ -134,24 +137,31 @@ automation will not stop.
 await execution.EndAsync("Ending the process");
 ```
 
-Registers the end of the execution.
+Registers the end of the execution. If no `ERROR` was registered before, the execution counts as
+successful.
 
 #### Result of each call
 
 Each method returns the event as stored by the API (`ExecutionEventResult`, with
 `AutomationId`, `ExecutionId`, `EventType`, `Description`, `ErrorId`, `ErrorDescription`,
-`CreatedAt` and `Environment`), or `null` if it could not be registered. You do not need to check
+`CreatedAt` and `Environment`, if the API returns it), or `null` if it could not be registered. You do not need to check
 it: the failure is already written to the log.
 
 ## Event semantics
 
+The API only accepts these five event types: **`START`, `EVENT`, `WARNING`, `ERROR` and `END`**.
+Any other value is rejected. You do not need to write them by hand: each SDK method sends its own.
+
 | Event | Method | Effect on the execution |
 |---|---|---|
-| `START` | `StartExecutionAsync` | Opens an execution. |
-| `EVENT` | `EventAsync` | Intermediate milestone. |
-| `WARNING` | `WarningAsync` | Intermediate milestone that needs attention. |
-| `ERROR` | `ErrorAsync` | Closes the execution as failed (see below). |
-| `END` | `EndAsync` | Closes the execution as finished. |
+| `START` | `StartExecutionAsync` | Registers the start of the execution. It must be the first event sent for an `executionId`. |
+| `EVENT` | `EventAsync` | Registers a relevant event during the execution, without marking it as finished, with a warning or failed. |
+| `WARNING` | `WarningAsync` | Registers a warning: something worth recording but not serious enough to make the execution fail. |
+| `ERROR` | `ErrorAsync` | Registers a failure or exception. The execution counts as failed (see below). |
+| `END` | `EndAsync` | Registers the end of the execution. If no `ERROR` was registered before, the execution counts as successful. |
+
+In the [low-level API](#low-level-api), the type is set with the `EventType` enum (`Start`,
+`Event`, `Warning`, `Error` and `End`), which the SDK turns into those same five values.
 
 An `ERROR` does not force you to open another execution. If more events with the same
 `executionId` arrive less than 1 hour after an `ERROR`, they are associated with that same
@@ -175,6 +185,24 @@ await execution.EndAsync("Process finished");
 ```
 
 ### Execution identifier (`executionId`)
+
+The `executionId` identifies one specific execution and follows two rules:
+
+- **It is the same for the whole execution.** All its events, from `START` to `END`, must be sent
+  with the `executionId` used in the `START`. This is how the API groups them.
+- **It is unique for each execution.** Each new execution of the automation must have a different
+  `executionId`, and it can never be reused in two concurrent executions. If you reuse one, the
+  events of two executions get mixed up.
+
+The usual formats are:
+
+| Format | Example |
+|---|---|
+| Timestamp (date and time when the execution starts) | `2026-07-27T11:52:15.716617` |
+| UUID | `3f2b8c1e-9d4a-4e7b-8f6c-2a1d5e9b7c30` |
+
+You can also use an identifier you already use internally in your system, as long as it follows
+both rules.
 
 Each time you call `StartExecutionAsync(...)`, it uses the `executionId` you pass or, if you do
 not pass one (or pass an empty string), it generates one from the current UTC date and time in
@@ -205,9 +233,9 @@ execution.ExecutionId                   -> you can store it and pass it to other
 The API does not return or change the identifier: what you see in the dashboard is exactly the
 value the SDK generated or received.
 
-An `executionId` identifies one execution and must not be reused in two simultaneous executions
-of the same automation. If an automation can run in parallel (for example, on several robots at
-once), pass your own unique identifier, such as `Guid.NewGuid().ToString()`.
+If an automation can run in parallel (for example, on several robots at once), two executions
+could start at the same instant and get the same timestamp. In that case, pass a UUID, such as
+`Guid.NewGuid().ToString()`.
 
 ## Synchronous usage
 
@@ -315,7 +343,7 @@ var client = new InfiniAnalyticsClient(new InfiniAnalyticsClientOptions
 | Option | Default | Description |
 |---|---|---|
 | `Token` | (required) | Organization token. Leading and trailing spaces and line breaks are removed. |
-| `BaseUrl` | `https://api.analytics.infini.es` | Base URL of the API. |
+| `BaseUrl` | `https://api.analytics.infini.es` | Base URL of the API. If you change it, always use `https://`: the API answers plain HTTP requests with a redirect. |
 | `Timeout` | 10 seconds | Maximum time for each call. When it runs out, the call is written to the log and returns `null`. `Timeout.InfiniteTimeSpan` disables it. |
 | `Logger` | Standard error output (`Console.Error`) | Receives the SDK messages (`Warning` or `Error` level, message and exception if any). |
 
@@ -391,11 +419,14 @@ All asynchronous methods accept an optional `CancellationToken`:
   hosts the robot loads another version. Copy all the dependencies listed in the
   [Blue Prism](#blue-prism) section and, if needed, add assembly binding redirects
   (`bindingRedirect`) to the `.config` file of the application.
-- **The API responds 401.** The token is not valid, has expired or has no access to that
-  automation.
+- **The API responds 401.** The token is missing or not valid. Check that it is your
+  organization token, as shown in the dashboard.
 - **The API responds 400.** The automation does not exist or the event type is not valid.
 - **The API responds 422.** The body is not valid, for example because `automationId` is not a
   UUID.
+- **The API responds 500 or another 5xx error.** The server has an unusually high load or a
+  temporary problem. The SDK writes it to the log and your automation continues. If it persists,
+  contact Infini Analytics support.
 
 ## Development
 

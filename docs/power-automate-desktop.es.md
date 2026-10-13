@@ -190,7 +190,7 @@ El código registra lo que diga `%IA_Tipo%`:
 
 | Valor de `IA_Tipo` | Qué registra |
 |---|---|
-| `EVENT` | Un hito del proceso |
+| `EVENT` | Un evento relevante del proceso |
 | `WARNING` | Un aviso que requiere atención |
 | `ERROR` | Un error |
 | `END` | El fin de la ejecución |

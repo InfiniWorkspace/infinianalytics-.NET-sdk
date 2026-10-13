@@ -188,7 +188,7 @@ The code registers whatever `%IA_EventType%` says:
 
 | Value of `IA_EventType` | What it registers |
 |---|---|
-| `EVENT` | A milestone of the process |
+| `EVENT` | A relevant event of the process |
 | `WARNING` | A warning that needs attention |
 | `ERROR` | An error |
 | `END` | The end of the execution |
